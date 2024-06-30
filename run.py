@@ -143,6 +143,19 @@ import base64
 #         print("")
 #         write_key_to_file(filename, key)
 
+
+# get rate USD to IDR
+def get_usd_to_idr_rate():
+    url = "https://open.er-api.com/v6/latest/USD"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        return data["rates"]["IDR"]
+    else:
+        print("Error fetching exchange rate")
+        return None
+
+
 # Open the file in read mode
 with open("apikey", "r") as file:
     # Read the lines of the file
@@ -183,7 +196,7 @@ def get_balance(api_key):
                 file.write(f"apikey = {new_api_key}")
             return get_balance(new_api_key)
         elif "NO_KEY" in response.text:
-            print("Invlaid APIkey SMSHUB\n")
+            print("Invalid APIkey SMSHUB\n")
             new_api_key = input("Please enter a new APIkey SMSHUB : ")
             print("")
             with open("apikey", "w") as file:
@@ -192,10 +205,18 @@ def get_balance(api_key):
         else:
             print("+-----------------------------+\n")
             print("Welcome to SMSHUB version CLI \n")
-            balance = (
-                response.text.replace("ACCESS_BALANCE:", "Your Balance : ") + " RUB\n"
-            )
-            return balance
+            balance_usd = float(response.text.replace("ACCESS_BALANCE:", ""))
+            exchange_rate = get_usd_to_idr_rate()
+            if exchange_rate:
+                balance_idr = balance_usd * exchange_rate
+                balance_idr_formatted = round(
+                    balance_idr, 3
+                )  # Rounds to three decimal places
+                print(
+                    f"Your Balance : {balance_usd} USD or {balance_idr_formatted} IDR\n"
+                )
+            else:
+                print(f"Your Balance : {balance_usd} USD\n")
     else:
         return None
 
@@ -332,10 +353,17 @@ def check_price(api_key):
         print("Sorry, invalid service or country.")
         return
 
+    # Fetch the USD to IDR exchange rate
+    exchange_rate = get_usd_to_idr_rate()
+
     # Print the price and stock
     for price, stock in service_data.items():
+        # Convert price to IDR
+        price_idr = float(price) * exchange_rate
+        # Format the price to three decimal places
+        price_idr_formatted = round(price_idr, 3)
         print(
-            f"Price: {colored(price, 'green')} RUB => Stock: {colored(stock, 'cyan')}"
+            f"Price: {colored(price, 'green')} USD / {colored(str(price_idr_formatted), 'yellow')} IDR => Stock: {colored(stock, 'cyan')}"
         )
 
 
@@ -388,6 +416,9 @@ def get_name_country(country):
 
 
 def lower_price(service_search, target_price):
+    # Fetch the USD to IDR exchange rate
+    exchange_rate = get_usd_to_idr_rate()
+
     # Base URL
     url = "https://smshub.org/stubs/handler_api.php"
 
@@ -407,9 +438,7 @@ def lower_price(service_search, target_price):
         if country in [51, 101, 151]:
             # Ask the user if they want to continue
             continue_check = input(
-                "Check the previous data, Do you want to continue? [y/n]: ".format(
-                    country
-                )
+                "Check the previous data, Do you want to continue? [y/n]: "
             )
             if continue_check.lower() == "n":
                 break
@@ -437,11 +466,13 @@ def lower_price(service_search, target_price):
             )
         else:
             for price in service_data.keys():
+                price_idr = float(price) * exchange_rate
+                price_idr_formatted = round(price_idr, 3)
                 # If the price is less than or equal to the target price, print the country code
                 if float(price) <= target_price:
                     print(
                         colored(
-                            f"Country {country_name} with code {country} has available and have the price of {price} RUB.",
+                            f"Country {country_name} with code {country} has available and have the price of {price} USD / {price_idr_formatted} IDR.",
                             "green",
                         )
                     )
@@ -449,7 +480,7 @@ def lower_price(service_search, target_price):
                 else:
                     print(
                         colored(
-                            f"Country {country_name} with code {country} has available but the lower price {price} RUB.",
+                            f"Country {country_name} with code {country} has available but the lower price {price} USD / {price_idr_formatted} IDR.",
                             "cyan",
                         )
                     )
